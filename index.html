@@ -1,0 +1,1588 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Portal Operações - Planning Poker Corporativo</title>
+  
+  <!-- Firebase Compat Scripts -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+  <!-- Canvas Confetti para celebrações -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <style>
+    :root {
+      --bg-gradient: radial-gradient(circle at 10% 20%, #1e1136 0%, #0b0f1d 50%, #05070e 100%);
+      --surface-glass: rgba(22, 27, 46, 0.78);
+      --surface-glass-card: rgba(33, 41, 71, 0.65);
+      --surface-glass-hover: rgba(56, 73, 128, 0.7);
+      --border-subtle: rgba(56, 189, 248, 0.2);
+      --border-active: rgba(236, 72, 153, 0.7);
+      
+      --cyan: #00f2fe;
+      --cyan-glow: rgba(0, 242, 254, 0.45);
+      --purple: #9d4edd;
+      --purple-glow: rgba(157, 78, 221, 0.45);
+      --pink: #ff007f;
+      --amber: #f59e0b;
+      --emerald: #10b981;
+      
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --danger: #f43f5e;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+    
+    body { 
+      background: var(--bg-gradient); 
+      color: var(--text); 
+      display: flex; 
+      height: 100vh; 
+      overflow: hidden; 
+      position: relative;
+    }
+
+    /* Barra Lateral */
+    aside { 
+      width: 360px; 
+      background: var(--surface-glass); 
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-right: 1px solid var(--border-subtle); 
+      display: flex; 
+      flex-direction: column; 
+      box-shadow: 10px 0 30px rgba(0, 0, 0, 0.5);
+      z-index: 10;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    aside.collapsed {
+      margin-left: -360px;
+    }
+
+    .sidebar-header { 
+      padding: 18px 20px; 
+      border-bottom: 1px solid var(--border-subtle); 
+      background: linear-gradient(180deg, rgba(157, 78, 221, 0.12) 0%, transparent 100%);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .sidebar-header h2 { 
+      font-size: 1.05rem; 
+      letter-spacing: 1px;
+      background: linear-gradient(90deg, #00f2fe, #4facfe, #9d4edd);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-transform: uppercase;
+      font-weight: 800;
+    }
+
+    .story-input-container { 
+      padding: 12px 18px; 
+      border-bottom: 1px solid var(--border-subtle); 
+    }
+
+    textarea { 
+      width: 100%; 
+      height: 65px; 
+      background: rgba(10, 15, 30, 0.85); 
+      border: 1px solid var(--border-subtle); 
+      border-radius: 10px; 
+      color: var(--text); 
+      padding: 10px; 
+      resize: none; 
+      font-size: 0.82rem; 
+      outline: none; 
+      transition: all 0.3s ease;
+    }
+
+    textarea:focus { 
+      border-color: var(--cyan); 
+      box-shadow: 0 0 15px var(--cyan-glow);
+    }
+
+    .btn { 
+      cursor: pointer; 
+      background: linear-gradient(135deg, #00f2fe 0%, #4facfe 50%, #9d4edd 100%); 
+      color: #030712; 
+      border: none; 
+      padding: 8px 14px; 
+      font-weight: 700; 
+      border-radius: 9px; 
+      transition: all 0.25s ease; 
+      box-shadow: 0 4px 15px rgba(0, 242, 254, 0.3);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      font-size: 0.82rem;
+      text-decoration: none;
+    }
+
+    .btn:hover { 
+      transform: translateY(-2px); 
+      box-shadow: 0 6px 20px rgba(157, 78, 221, 0.5);
+      color: #fff;
+    }
+
+    .btn-secondary { 
+      background: rgba(255, 255, 255, 0.08); 
+      color: var(--text); 
+      border: 1px solid rgba(255, 255, 255, 0.15); 
+      box-shadow: none;
+    }
+
+    .btn-secondary:hover { 
+      color: #fff; 
+      background: rgba(255, 255, 255, 0.15); 
+      border-color: var(--cyan);
+    }
+
+    .btn-success {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: #fff;
+      box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+    }
+
+    .btn-danger {
+      background: linear-gradient(135deg, rgba(244, 63, 94, 0.2), rgba(244, 63, 94, 0.4));
+      color: #fca5a5;
+      border: 1px solid rgba(244, 63, 94, 0.35);
+      box-shadow: none;
+    }
+
+    .btn-amber {
+      background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+      color: #05070e;
+      box-shadow: 0 4px 15px rgba(245, 158, 11, 0.3);
+    }
+
+    .story-list { 
+      flex: 1; 
+      overflow-y: auto; 
+      padding: 12px 16px; 
+      list-style: none; 
+    }
+
+    .story-item { 
+      background: var(--surface-glass-card); 
+      padding: 12px 14px; 
+      border-radius: 10px; 
+      border: 1px solid var(--border-subtle); 
+      margin-bottom: 10px; 
+      cursor: pointer; 
+      font-size: 0.83rem;
+      transition: all 0.25s ease;
+      position: relative;
+    }
+
+    .story-item:hover { 
+      border-color: var(--cyan); 
+      background: rgba(0, 242, 254, 0.08); 
+      transform: translateX(3px);
+    }
+
+    .story-item.active { 
+      border-color: var(--pink); 
+      background: linear-gradient(90deg, rgba(255, 0, 127, 0.15) 0%, rgba(157, 78, 221, 0.12) 100%);
+      box-shadow: 0 0 15px rgba(255, 0, 127, 0.2);
+    }
+
+    .story-meta {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    .badge-status {
+      font-size: 0.68rem;
+      padding: 2px 7px;
+      border-radius: 5px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .badge-pending {
+      background: rgba(245, 158, 11, 0.2);
+      border: 1px solid var(--amber);
+      color: #fcd34d;
+    }
+
+    .badge-ready {
+      background: rgba(0, 242, 254, 0.2);
+      border: 1px solid var(--cyan);
+      color: #67e8f9;
+    }
+
+    .badge-done {
+      background: rgba(16, 185, 129, 0.2);
+      border: 1px solid var(--emerald);
+      color: #6ee7b7;
+    }
+
+    .badge-pdf-button {
+      font-size: 0.7rem;
+      color: var(--cyan);
+      cursor: pointer;
+      text-decoration: underline;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      background: none;
+      border: none;
+      font-weight: 600;
+    }
+
+    .sidebar-footer {
+      padding: 12px 18px;
+      border-top: 1px solid var(--border-subtle);
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    /* Área Principal */
+    main { 
+      flex: 1; 
+      display: flex; 
+      flex-direction: column; 
+      padding: 18px 28px; 
+      overflow-y: auto; 
+      position: relative;
+    }
+
+    header { 
+      display: flex; 
+      justify-content: space-between; 
+      align-items: center; 
+      margin-bottom: 12px; 
+      padding-bottom: 12px; 
+      border-bottom: 1px solid var(--border-subtle); 
+    }
+
+    .brand-section {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .logo-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255, 255, 255, 0.05);
+      padding: 6px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(157, 78, 221, 0.3);
+      box-shadow: 0 0 15px rgba(157, 78, 221, 0.2);
+    }
+
+    .logo-prodesp {
+      height: 36px;
+      width: auto;
+      object-fit: contain;
+      filter: invert(1) hue-rotate(185deg) brightness(1.25) contrast(1.1);
+      mix-blend-mode: screen;
+    }
+
+    .room-info h1 { 
+      font-size: 1.3rem; 
+      font-weight: 800;
+      background: linear-gradient(90deg, #ffffff, #c7d2fe);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .user-profile { 
+      display: flex; 
+      align-items: center; 
+      gap: 10px; 
+    }
+
+    select, input[type="text"], input[type="number"], input[type="password"] { 
+      background: rgba(15, 23, 42, 0.85); 
+      border: 1px solid var(--border-subtle); 
+      color: var(--text); 
+      padding: 8px 12px; 
+      border-radius: 9px; 
+      outline: none; 
+      font-size: 0.84rem;
+      transition: all 0.2s ease;
+    }
+
+    select:focus, input:focus {
+      border-color: var(--cyan);
+      box-shadow: 0 0 10px var(--cyan-glow);
+    }
+
+    /* Timer e Barra de Notificações */
+    .top-action-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .timer-container {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--surface-glass);
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      padding: 6px 14px;
+    }
+
+    .timer-display {
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: var(--cyan);
+      font-variant-numeric: tabular-nums;
+      min-width: 48px;
+    }
+
+    .timer-display.urgent {
+      color: var(--danger);
+      animation: pulseGlow 0.8s infinite alternate;
+    }
+
+    .ready-banner {
+      flex: 1;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 8px 14px;
+      border-radius: 10px;
+      background: linear-gradient(90deg, rgba(245, 158, 11, 0.2), rgba(236, 72, 153, 0.25));
+      border: 1px solid var(--pink);
+      color: #fff;
+      font-weight: 700;
+      font-size: 0.85rem;
+      animation: pulseGlow 1.2s infinite alternate;
+    }
+
+    @keyframes pulseGlow {
+      from { box-shadow: 0 0 8px rgba(255, 0, 127, 0.3); transform: scale(0.995); }
+      to { box-shadow: 0 0 20px rgba(0, 242, 254, 0.6); transform: scale(1.005); }
+    }
+
+    /* Painel do Analista de Requisitos */
+    .qa-box {
+      display: none;
+      background: linear-gradient(135deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.95));
+      border: 1px solid var(--cyan);
+      border-radius: 14px;
+      padding: 14px 18px;
+      margin-bottom: 12px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+    }
+
+    .qa-box.active { display: block; }
+    .qa-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .qa-header h4 { font-size: 0.88rem; color: var(--cyan); text-transform: uppercase; letter-spacing: 0.5px; }
+
+    .qa-form-grid {
+      display: grid;
+      grid-template-columns: 1.5fr 1.5fr 0.8fr auto;
+      gap: 12px;
+      align-items: flex-end;
+    }
+
+    .file-input-wrapper input[type="file"] {
+      display: block;
+      width: 100%;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      background: rgba(10, 15, 30, 0.7);
+      padding: 6px;
+      border: 1px dashed var(--border-subtle);
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    /* Mesa Central */
+    .poker-table-container { 
+      display: flex; 
+      flex-direction: column; 
+      align-items: center; 
+      justify-content: center; 
+      background: radial-gradient(ellipse at center, rgba(79, 70, 229, 0.22) 0%, rgba(15, 23, 42, 0.8) 75%); 
+      backdrop-filter: blur(25px);
+      border: 2px solid rgba(157, 78, 221, 0.3); 
+      border-radius: 20px; 
+      padding: 20px 16px; 
+      min-height: 220px; 
+      position: relative; 
+      margin-bottom: 12px; 
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), inset 0 0 35px rgba(157, 78, 221, 0.15);
+    }
+
+    .current-topic { text-align: center; margin-bottom: 14px; max-width: 80%; }
+    .current-topic span { 
+      font-size: 0.72rem; 
+      color: var(--cyan); 
+      text-transform: uppercase; 
+      letter-spacing: 1.5px; 
+      font-weight: 700;
+    }
+    
+    .current-topic h3 { 
+      font-size: 1.15rem; 
+      color: #fff; 
+      margin-top: 4px; 
+      font-weight: 700; 
+    }
+
+    .current-topic-acceptance {
+      margin-top: 4px;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      font-style: italic;
+    }
+
+    .current-pdf-access {
+      margin-top: 6px;
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .players-grid { 
+      display: flex; 
+      flex-wrap: wrap; 
+      justify-content: center; 
+      gap: 16px; 
+      margin-bottom: 12px; 
+    }
+
+    .player-card { display: flex; flex-direction: column; align-items: center; gap: 6px; position: relative; }
+    
+    .player-card .card-box { 
+      width: 52px; 
+      height: 76px; 
+      background: rgba(255, 255, 255, 0.04); 
+      border: 2px dashed rgba(255, 255, 255, 0.2); 
+      border-radius: 10px; 
+      display: flex; 
+      align-items: center; 
+      justify-content: center; 
+      font-weight: 800; 
+      font-size: 1.25rem; 
+      transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); 
+    }
+
+    .player-card.has-voted .card-box { 
+      border-style: solid; 
+      border-color: var(--cyan); 
+      background: linear-gradient(135deg, rgba(0, 242, 254, 0.25), rgba(79, 70, 229, 0.25)); 
+      color: transparent; 
+      box-shadow: 0 0 18px var(--cyan-glow);
+      transform: translateY(-4px);
+    }
+
+    .player-card.revealed .card-box { 
+      background: linear-gradient(135deg, #f59e0b, #ec4899); 
+      color: #ffffff; 
+      border-style: solid; 
+      border-color: transparent;
+      box-shadow: 0 0 22px rgba(236, 72, 153, 0.55);
+      transform: translateY(-5px) scale(1.06);
+    }
+
+    .player-name { font-size: 0.78rem; color: #cbd5e1; font-weight: 600; }
+    .table-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 6px; }
+
+    /* Painel de Divergências GP */
+    .debate-panel {
+      display: none;
+      background: linear-gradient(135deg, rgba(30, 41, 59, 0.85) 0%, rgba(15, 23, 42, 0.95) 100%);
+      border: 1px solid var(--purple);
+      border-radius: 14px;
+      padding: 12px 16px;
+      margin-bottom: 12px;
+    }
+
+    .debate-panel.active { display: block; }
+    .debate-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .debate-header h4 { font-size: 0.86rem; color: var(--cyan); text-transform: uppercase; }
+
+    .debate-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1.2fr;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .debate-card {
+      background: rgba(255, 255, 255, 0.04);
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .debate-card.min { border-color: rgba(56, 189, 248, 0.4); }
+    .debate-card.max { border-color: rgba(244, 63, 94, 0.4); }
+    .debate-card span { font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; display: block; }
+    .debate-card strong { font-size: 0.95rem; display: block; }
+    .debate-card small { font-size: 0.72rem; color: #cbd5e1; }
+
+    .debate-script {
+      background: rgba(157, 78, 221, 0.12);
+      border-left: 3px solid var(--purple);
+      padding: 8px 10px;
+      border-radius: 0 8px 8px 0;
+      font-size: 0.75rem;
+      line-height: 1.35;
+    }
+
+    /* Métricas */
+    .metrics-bar { 
+      display: grid; 
+      grid-template-columns: repeat(4, 1fr); 
+      gap: 12px; 
+      margin-bottom: 12px; 
+    }
+
+    .metric-item { 
+      background: var(--surface-glass); 
+      border: 1px solid var(--border-subtle); 
+      padding: 8px 12px; 
+      border-radius: 12px; 
+      text-align: center; 
+      position: relative;
+    }
+
+    .metric-item::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; }
+    .metric-item:nth-child(1)::before { background: var(--cyan); }
+    .metric-item:nth-child(2)::before { background: var(--purple); }
+    .metric-item:nth-child(3)::before { background: var(--pink); }
+    .metric-item:nth-child(4)::before { background: var(--emerald); }
+
+    .metric-item span { display: block; font-size: 0.66rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 2px; font-weight: 600; }
+    .metric-item strong { font-size: 1.2rem; font-weight: 800; }
+
+    /* Deck */
+    .deck-container { margin-top: auto; }
+    .deck-container h4 { 
+      font-size: 0.78rem; 
+      color: var(--cyan); 
+      margin-bottom: 6px; 
+      text-transform: uppercase; 
+      font-weight: 700;
+    }
+
+    .cards-row { display: flex; gap: 8px; overflow-x: auto; padding: 4px 2px 8px 2px; }
+    
+    .deck-card { 
+      min-width: 52px; 
+      height: 78px; 
+      background: var(--surface-glass-card); 
+      border: 1px solid var(--border-subtle); 
+      border-radius: 10px; 
+      display: flex; 
+      flex-direction: column; 
+      align-items: center; 
+      justify-content: center; 
+      cursor: pointer; 
+      font-size: 1.15rem; 
+      font-weight: 800; 
+      color: var(--text); 
+      transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); 
+      user-select: none; 
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+    }
+
+    .deck-card:hover { 
+      border-color: var(--cyan); 
+      transform: translateY(-6px) scale(1.05); 
+      background: linear-gradient(180deg, rgba(0, 242, 254, 0.2) 0%, rgba(15, 23, 42, 0.8) 100%); 
+      box-shadow: 0 10px 22px var(--cyan-glow);
+    }
+
+    .deck-card.selected { 
+      background: linear-gradient(135deg, #00f2fe 0%, #4facfe 50%, #9d4edd 100%); 
+      color: #030712; 
+      transform: translateY(-6px) scale(1.06); 
+      border-color: transparent;
+      box-shadow: 0 0 25px rgba(0, 242, 254, 0.7);
+    }
+
+    .deck-card span { font-size: 0.6rem; font-weight: 600; margin-top: 2px; opacity: 0.85; }
+
+    /* Rodapé */
+    .system-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 10px;
+      margin-top: 4px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      font-size: 0.72rem;
+      color: var(--text-muted);
+    }
+
+    .system-footer strong { color: var(--cyan); font-weight: 600; }
+
+    /* Modais */
+    .modal-overlay { 
+      position: fixed; 
+      top: 0; left: 0; width: 100vw; height: 100vh; 
+      background: rgba(3, 7, 18, 0.85); 
+      backdrop-filter: blur(10px);
+      display: none; 
+      align-items: center; 
+      justify-content: center; 
+      z-index: 999; 
+    }
+
+    .modal-overlay.active { display: flex !important; }
+
+    .modal-box { 
+      background: rgba(18, 24, 43, 0.98); 
+      border: 1px solid var(--border-active); 
+      border-radius: 16px; 
+      width: 480px; 
+      max-width: 90%; 
+      padding: 22px; 
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.7); 
+    }
+
+    .modal-box.modal-large {
+      width: 85vw;
+      height: 85vh;
+      max-width: 1200px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .modal-box h3 { 
+      margin-bottom: 12px; 
+      background: linear-gradient(90deg, #00f2fe, #ff007f);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      display: flex; 
+      justify-content: space-between; 
+      align-items: center; 
+      font-size: 1.15rem;
+      font-weight: 800;
+    }
+
+    .form-group { margin-bottom: 12px; }
+    .form-group label { display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px; }
+    .form-group input, .form-group select { width: 100%; }
+    .checkbox-group { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+    .checkbox-group label { font-size: 0.82rem; color: var(--text); cursor: pointer; }
+    .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+  </style>
+</head>
+<body>
+
+  <!-- Modal Visualizador Embutido de PDF -->
+  <div class="modal-overlay" id="pdfViewerModal">
+    <div class="modal-box modal-large">
+      <h3>
+        <span id="pdfViewerTitle">📄 Requisitos da Demanda</span>
+        <button class="btn btn-secondary" onclick="closePdfModal()" style="padding: 2px 8px;">✕</button>
+      </h3>
+      <div style="flex: 1; border-radius: 10px; overflow: hidden; background: #070a13; border: 1px solid var(--border-subtle); margin-top: 10px;">
+        <iframe id="pdfViewerIframe" src="" style="width: 100%; height: 100%; border: none;"></iframe>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Senha GP ou Analista -->
+  <div class="modal-overlay" id="passwordModal">
+    <div class="modal-box" style="width: 360px;">
+      <h3><span id="pwdModalTitle">🔒 Acesso Restrito</span></h3>
+      <div class="form-group" style="margin-top: 14px;">
+        <label id="pwdModalPrompt">Digite a senha de acesso:</label>
+        <input type="password" id="inputRolePassword" placeholder="Senha" onkeydown="if(event.key==='Enter') submitRolePassword()">
+        <span id="passwordError" style="display: none; color: var(--danger); font-size: 0.76rem; margin-top: 6px;">Senha incorreta. Tente novamente.</span>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="cancelPassword()">Cancelar</button>
+        <button class="btn" onclick="submitRolePassword()">Entrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Configurações GP -->
+  <div class="modal-overlay" id="configModal">
+    <div class="modal-box">
+      <h3>
+        <span>⚙️ Parâmetros do Jogo</span>
+        <button class="btn btn-secondary" onclick="closeConfigModal()" style="padding: 2px 8px;">✕</button>
+      </h3>
+      
+      <div class="form-group">
+        <label>Nome da Sprint / Sala:</label>
+        <input type="text" id="cfgGameName" value="Sprint 14 — Portal Operações">
+      </div>
+
+      <div class="form-group">
+        <label>Baralho de Cartas:</label>
+        <select id="cfgCardSet">
+          <option value="modified_fibonacci">Modified Fibonacci (0, ½, 1, 2, 3, 5, 8, 13, 20, 40, 100, ?, ☕)</option>
+          <option value="standard_fibonacci">Fibonacci Padrão (0, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, ?)</option>
+          <option value="powers_of_2">Powers of 2 (0, 1, 2, 4, 8, 16, 32, 64, ?)</option>
+          <option value="t_shirt">T-Shirt (XXS, XS, S, M, L, XL, XXL, ?)</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Fator de Conversão Dev (1 Ponto = X Horas):</label>
+        <input type="number" id="cfgHourMultiplier" value="2" min="0.5" step="0.5">
+      </div>
+
+      <div class="checkbox-group">
+        <input type="checkbox" id="cfgAllowChange" checked>
+        <label for="cfgAllowChange">Permitir reajuste de voto após revelação</label>
+      </div>
+
+      <div class="checkbox-group">
+        <input type="checkbox" id="cfgCalcScore" checked>
+        <label for="cfgCalcScore">Cálculo automático de moda e horas</label>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeConfigModal()">Cancelar</button>
+        <button class="btn" onclick="saveConfig()">Salvar Parâmetros</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Barra Lateral -->
+  <aside id="mainSidebar">
+    <div class="sidebar-header">
+      <h2>Backlog da Sprint</h2>
+      <button class="btn btn-secondary" onclick="toggleSidebar()" title="Recolher Menu" style="padding: 3px 8px;">◀</button>
+    </div>
+
+    <!-- Ações Facilitador (GP) -->
+    <div class="story-input-container" id="storyInputSection" style="display: none;">
+      <textarea id="storyInput" placeholder="Cadastre demandas (uma por linha)&#10;Ex: DMND0001467 - STRY0039295 Exame Teórico"></textarea>
+      <div style="display: flex; gap: 8px; margin-top: 8px;">
+        <button class="btn" style="flex: 1;" onclick="addStories()">Carregar</button>
+        <button class="btn btn-danger" onclick="clearBacklog()" title="Limpar Sprint">Limpar</button>
+      </div>
+    </div>
+
+    <ul class="story-list" id="storyList"></ul>
+
+    <div class="sidebar-footer">
+      <button class="btn btn-secondary" onclick="exportSprintReport()" style="width: 100%;">📊 Exportar Relatório Excel</button>
+      <span style="text-align: center;">Idealizado pelo GP <strong>Abner Maciel</strong></span>
+    </div>
+  </aside>
+
+  <!-- Área Principal -->
+  <main>
+    <header>
+      <div class="brand-section">
+        <button class="btn btn-secondary" id="btnExpandSidebar" onclick="toggleSidebar()" title="Expandir Menu Lateral" style="display: none; padding: 4px 9px;">▶ Menu</button>
+        <div class="logo-container" title="Prodesp - Tecnologia da Informação">
+          <img class="logo-prodesp" 
+               src="prodesp.jpg" 
+               alt="Prodesp" 
+               onerror="this.onerror=null; this.src='https://upload.wikimedia.org/wikipedia/commons/2/23/Prodesp_logo.png';">
+        </div>
+        <div class="room-info">
+          <h1 id="headerGameName">Sprint 14 — Portal Operações</h1>
+          <p style="font-size: 0.76rem; color: var(--text-muted); margin-top: 2px;">
+            Métrica: <strong style="color: var(--cyan);">1 Ponto Dev = <span id="lblMultiplier">2</span>h</strong>
+          </p>
+        </div>
+      </div>
+
+      <div class="user-profile">
+        <button class="btn btn-secondary" id="btnOpenConfig" style="display: none;" onclick="openConfigModal()">⚙️ Configurações</button>
+        <input type="text" id="userName" placeholder="Seu nome" onchange="updateName()">
+        <select id="userRole" onchange="onRoleChange()">
+          <option value="dev">Dev (Vota)</option>
+          <option value="facilitator">Facilitador / GP</option>
+          <option value="analyst">Analista de Requisitos / QA</option>
+          <option value="observer">Observador</option>
+        </select>
+      </div>
+    </header>
+
+    <!-- Barra de Notificação e Timer -->
+    <div class="top-action-bar">
+      <!-- Cronômetro Timebox -->
+      <div class="timer-container">
+        <span style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">⏱️ Timebox:</span>
+        <span class="timer-display" id="timerDisplay">00:00</span>
+        <div id="gpTimerControls" style="display: none; gap: 4px;">
+          <button class="btn btn-secondary" onclick="startTimer(60)" style="padding: 2px 6px; font-size: 0.72rem;">60s</button>
+          <button class="btn btn-secondary" onclick="startTimer(90)" style="padding: 2px 6px; font-size: 0.72rem;">90s</button>
+          <button class="btn btn-secondary" onclick="stopTimer()" style="padding: 2px 6px; font-size: 0.72rem;">Pausar</button>
+        </div>
+      </div>
+
+      <!-- Alerta Piscante Todos Votaram -->
+      <div class="ready-banner" id="readyNotificationBanner">
+        <span>🔔</span>
+        <span><strong>Todos os Devs já votaram!</strong> As cartas já podem ser reveladas.</span>
+      </div>
+    </div>
+
+    <!-- Painel do Analista de Requisitos / QA -->
+    <div class="qa-box" id="qaControlBox">
+      <div class="qa-header">
+        <h4>📋 Gestão de Requisitos & Critérios de Aceite (QA)</h4>
+        <span style="font-size: 0.74rem; color: var(--text-muted);" id="qaSelectedStoryName">Selecione uma tarefa para editar</span>
+      </div>
+      <div class="qa-form-grid">
+        <div class="file-input-wrapper">
+          <label style="font-size: 0.72rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Arquivo PDF:</label>
+          <input type="file" id="inputQaPdfFile" accept="application/pdf">
+          <small id="lblCurrentPdfName" style="font-size: 0.7rem; color: var(--cyan); display: block; margin-top: 3px;"></small>
+        </div>
+        <div>
+          <label style="font-size: 0.72rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Critérios de Aceite (Resumo):</label>
+          <input type="text" id="inputQaAcceptance" placeholder="Ex: Regra da validação de biometria" style="width: 100%;">
+        </div>
+        <div>
+          <label style="font-size: 0.72rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Horas QA:</label>
+          <input type="number" id="inputQaTestHours" placeholder="Horas" min="0" step="0.5" style="width: 100%;">
+        </div>
+        <div>
+          <button class="btn btn-success" onclick="saveRequirementsAndQA()">Salvar Demanda</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mesa Central -->
+    <div class="poker-table-container">
+      <div class="current-topic">
+        <span>História em Votação</span>
+        <h3 id="activeStoryTitle">Aguardando seleção...</h3>
+        <p class="current-topic-acceptance" id="activeStoryAcceptance"></p>
+        <div id="activeStoryPdfContainer" class="current-pdf-access"></div>
+      </div>
+
+      <div class="players-grid" id="playersGrid"></div>
+
+      <!-- Ações do Facilitador GP -->
+      <div class="table-actions" id="adminTableActions" style="display: none;">
+        <button class="btn" onclick="toggleReveal()" id="btnReveal">Revelar Cartas</button>
+        <button class="btn btn-secondary" onclick="resetRound()">Reiniciar Rodada</button>
+      </div>
+    </div>
+
+    <!-- Painel de Divergências GP -->
+    <div class="debate-panel" id="debatePanel">
+      <div class="debate-header">
+        <h4>🎯 Análise de Divergências & Consenso Técnico</h4>
+        <span style="font-size: 0.74rem; color: var(--cyan); font-weight: 600;" id="debateAvgAdoption">Média sugerida: -</span>
+      </div>
+      <div class="debate-grid">
+        <div class="debate-card min">
+          <span>📉 Menor Estimativa</span>
+          <strong id="minVoteDevs" style="color: var(--cyan);">-</strong>
+          <small id="minVoteVal">-</small>
+        </div>
+        <div class="debate-card max">
+          <span>📈 Maior Estimativa</span>
+          <strong id="maxVoteDevs" style="color: var(--pink);">-</strong>
+          <small id="maxVoteVal">-</small>
+        </div>
+        <div class="debate-script">
+          <strong>Roteiro GP:</strong>
+          <div id="debateScriptText" style="margin-top: 3px;">Pergunte aos extremos sobre complexidades ou simplificações.</div>
+        </div>
+      </div>
+      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;">
+        <button class="btn btn-secondary" onclick="allowDevsToAdjust()">🔄 Reabrir para Ajustes</button>
+        <button class="btn btn-success" id="btnAssignScore" onclick="assignScoreToCurrentStory()">💾 Concluir Estimativa Dev</button>
+      </div>
+    </div>
+
+    <!-- Métricas Gerais -->
+    <div class="metrics-bar">
+      <div class="metric-item">
+        <span>Votos Registrados</span>
+        <strong id="statVoted" style="color: var(--cyan);">0/0</strong>
+      </div>
+      <div class="metric-item">
+        <span>Consenso Dev (Pontos)</span>
+        <strong id="statConsensus" style="color: var(--purple);">-</strong>
+      </div>
+      <div class="metric-item">
+        <span>Horas Testes (QA)</span>
+        <strong id="statQaHours" style="color: var(--amber);">-</strong>
+      </div>
+      <div class="metric-item">
+        <span>Total Demanda (Dev + QA)</span>
+        <strong id="statTotalHours" style="color: var(--emerald);">-</strong>
+      </div>
+    </div>
+
+    <!-- Baralho -->
+    <div class="deck-container" id="deckSection">
+      <h4>Selecione a sua estimativa:</h4>
+      <div class="cards-row" id="cardsDeck"></div>
+    </div>
+
+    <!-- Rodapé -->
+    <footer class="system-footer">
+      <span>Portal de Operações • Prodesp</span>
+      <span>Criado pelo Gerente de Projetos <strong>Abner Maciel</strong></span>
+    </footer>
+  </main>
+
+  <script>
+    const GP_PASSWORD = "A4dmti7894@";
+    const ANALYST_PASSWORD = "Reqqa2026@";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAsBY2yYno5HMaFkmiDAZfKCTtLjZYikPA",
+      authDomain: "planningpoker-e2caa.firebaseapp.com",
+      databaseURL: "https://planningpoker-e2caa-default-rtdb.firebaseio.com",
+      projectId: "planningpoker-e2caa",
+      storageBucket: "planningpoker-e2caa.firebasestorage.app",
+      messagingSenderId: "153909141932",
+      appId: "1:153909141932:web:f6b042db4bbd48c9cf1a09",
+      measurementId: "G-YWFE7JBCZB"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+    const roomRef = db.ref('rooms/sprint14');
+
+    const DECKS = {
+      modified_fibonacci: ['0', '½', '1', '2', '3', '5', '8', '13', '20', '40', '100', '?', '☕'],
+      standard_fibonacci: ['0', '1', '2', '3', '5', '8', '13', '21', '34', '55', '89', '?', '☕'],
+      powers_of_2: ['0', '1', '2', '4', '8', '16', '32', '64', '?', '☕'],
+      t_shirt: ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', '?', '☕']
+    };
+
+    let config = {
+      gameName: 'Sprint 14 — Portal Operações',
+      cardSet: 'modified_fibonacci',
+      hourMultiplier: 2,
+      allowChange: true,
+      calcScore: true
+    };
+
+    let gameState = {
+      activeStory: 'Aguardando seleção...',
+      activeStoryKey: null,
+      stories: {},
+      revealed: false,
+      players: {},
+      timerSeconds: 0,
+      timerRunning: false
+    };
+
+    let myId = localStorage.getItem('poker_uid') || 'dev_' + Math.floor(Math.random() * 10000);
+    localStorage.setItem('poker_uid', myId);
+
+    let myName = localStorage.getItem('poker_name') || 'Membro ' + myId.slice(-2);
+    let myRole = 'dev';
+    let previousRole = 'dev';
+    let pendingAuthRole = null;
+    let myVote = null;
+    let currentCalculatedConsensus = null;
+    let timerInterval = null;
+
+    document.getElementById('userName').value = myName;
+    document.getElementById('userRole').value = myRole;
+
+    // Presença em Tempo Real: onDisconnect elimina usuários ao fechar a janela
+    const amOnline = db.ref('.info/connected');
+    const myPlayerRef = roomRef.child('players/' + myId);
+
+    amOnline.on('value', (snapshot) => {
+      if (snapshot.val() === true) {
+        myPlayerRef.onDisconnect().remove();
+        syncMyPlayer();
+      }
+    });
+
+    roomRef.child('config').on('value', (snapshot) => {
+      const cfg = snapshot.val();
+      if (cfg) {
+        config = cfg;
+        applyConfig();
+      }
+    });
+
+    roomRef.child('timer').on('value', (snapshot) => {
+      const timerData = snapshot.val();
+      if (timerData) {
+        renderTimer(timerData.seconds, timerData.running);
+      } else {
+        renderTimer(0, false);
+      }
+    });
+
+    roomRef.on('value', (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        if (data.config) config = data.config;
+        gameState.stories = data.stories || {};
+        gameState.activeStory = data.activeStory || 'Aguardando seleção...';
+        gameState.activeStoryKey = data.activeStoryKey || null;
+        gameState.revealed = data.revealed || false;
+        gameState.players = data.players || {};
+
+        if (gameState.players[myId]) {
+          myVote = gameState.players[myId].vote;
+        }
+
+        applyConfig();
+        renderStories();
+        renderTable();
+        syncQaBoxFields();
+      }
+    });
+
+    function updateName() {
+      myName = document.getElementById('userName').value || 'Anônimo';
+      localStorage.setItem('poker_name', myName);
+      syncMyPlayer();
+    }
+
+    function onRoleChange() {
+      const selectedRole = document.getElementById('userRole').value;
+      if (selectedRole === 'facilitator') {
+        pendingAuthRole = 'facilitator';
+        document.getElementById('pwdModalTitle').innerText = '🔒 Acesso do Gerente de Projetos';
+        document.getElementById('pwdModalPrompt').innerText = 'Digite a senha do GP:';
+        openAuthModal();
+      } else if (selectedRole === 'analyst') {
+        pendingAuthRole = 'analyst';
+        document.getElementById('pwdModalTitle').innerText = '📋 Acesso Requisitos / QA';
+        document.getElementById('pwdModalPrompt').innerText = 'Digite a senha de Requisitos/QA:';
+        openAuthModal();
+      } else {
+        myRole = selectedRole;
+        previousRole = myRole;
+        if (myRole !== 'dev') myVote = null;
+        applyRolePermissions();
+        syncMyPlayer();
+      }
+    }
+
+    function openAuthModal() {
+      document.getElementById('passwordError').style.display = 'none';
+      document.getElementById('inputRolePassword').value = '';
+      document.getElementById('passwordModal').classList.add('active');
+      setTimeout(() => document.getElementById('inputRolePassword').focus(), 150);
+    }
+
+    function submitRolePassword() {
+      const pass = document.getElementById('inputRolePassword').value;
+      let authorized = false;
+
+      if (pendingAuthRole === 'facilitator' && pass === GP_PASSWORD) authorized = true;
+      if (pendingAuthRole === 'analyst' && pass === ANALYST_PASSWORD) authorized = true;
+
+      if (authorized) {
+        document.getElementById('passwordModal').classList.remove('active');
+        myRole = pendingAuthRole;
+        previousRole = myRole;
+        myVote = null;
+        applyRolePermissions();
+        syncMyPlayer();
+      } else {
+        document.getElementById('passwordError').style.display = 'block';
+      }
+    }
+
+    function cancelPassword() {
+      document.getElementById('passwordModal').classList.remove('active');
+      document.getElementById('userRole').value = previousRole;
+    }
+
+    function applyRolePermissions() {
+      const isGP = (myRole === 'facilitator');
+      const isAnalyst = (myRole === 'analyst');
+      
+      document.getElementById('btnOpenConfig').style.display = isGP ? 'inline-block' : 'none';
+      document.getElementById('adminTableActions').style.display = isGP ? 'flex' : 'none';
+      document.getElementById('storyInputSection').style.display = isGP ? 'block' : 'none';
+      document.getElementById('gpTimerControls').style.display = isGP ? 'inline-flex' : 'none';
+      document.getElementById('qaControlBox').classList.toggle('active', isAnalyst || isGP);
+
+      renderDeck();
+    }
+
+    function toggleSidebar() {
+      const sb = document.getElementById('mainSidebar');
+      sb.classList.toggle('collapsed');
+      document.getElementById('btnExpandSidebar').style.display = sb.classList.contains('collapsed') ? 'inline-flex' : 'none';
+    }
+
+    function openConfigModal() {
+      if (myRole !== 'facilitator') return;
+      document.getElementById('cfgGameName').value = config.gameName;
+      document.getElementById('cfgCardSet').value = config.cardSet;
+      document.getElementById('cfgHourMultiplier').value = config.hourMultiplier;
+      document.getElementById('cfgAllowChange').checked = config.allowChange;
+      document.getElementById('cfgCalcScore').checked = config.calcScore;
+      document.getElementById('configModal').classList.add('active');
+    }
+
+    function closeConfigModal() {
+      document.getElementById('configModal').classList.remove('active');
+    }
+
+    function saveConfig() {
+      if (myRole !== 'facilitator') return;
+
+      config.gameName = document.getElementById('cfgGameName').value;
+      config.cardSet = document.getElementById('cfgCardSet').value;
+      config.hourMultiplier = parseFloat(document.getElementById('cfgHourMultiplier').value) || 2;
+      config.allowChange = document.getElementById('cfgAllowChange').checked;
+      config.calcScore = document.getElementById('cfgCalcScore').checked;
+
+      roomRef.child('config').set(config);
+      closeConfigModal();
+    }
+
+    function applyConfig() {
+      document.getElementById('headerGameName').innerText = config.gameName;
+      document.getElementById('lblMultiplier').innerText = config.hourMultiplier;
+      renderDeck();
+    }
+
+    function parseCard(val) {
+      if (val === '½') return 0.5;
+      const parsed = parseFloat(val);
+      return isNaN(parsed) ? NaN : parsed;
+    }
+
+    function syncMyPlayer() {
+      myPlayerRef.set({
+        id: myId,
+        name: myName,
+        role: myRole,
+        vote: myVote
+      });
+    }
+
+    function selectCard(val) {
+      if (myRole !== 'dev') return;
+      
+      const activeStory = gameState.activeStoryKey ? gameState.stories[gameState.activeStoryKey] : null;
+      if (!activeStory || !activeStory.pdfData) {
+        alert('Esta história ainda está aguardando o upload do PDF de requisitos pelo Analista.');
+        return;
+      }
+
+      if (gameState.revealed && !config.allowChange) return;
+
+      myVote = (myVote === val) ? null : val;
+      syncMyPlayer();
+    }
+
+    function renderDeck() {
+      const container = document.getElementById('cardsDeck');
+      container.innerHTML = '';
+      if (myRole !== 'dev') {
+        document.getElementById('deckSection').style.display = 'none';
+        return;
+      }
+      document.getElementById('deckSection').style.display = 'block';
+
+      const activeDeck = DECKS[config.cardSet] || DECKS.modified_fibonacci;
+
+      activeDeck.forEach(cardVal => {
+        const div = document.createElement('div');
+        div.className = `deck-card ${myVote === cardVal ? 'selected' : ''}`;
+        
+        let hoursHint = '';
+        const numVal = parseCard(cardVal);
+        if (!isNaN(numVal)) {
+          hoursHint = `<span>${numVal * config.hourMultiplier}h Dev</span>`;
+        }
+
+        div.innerHTML = `${cardVal}${hoursHint}`;
+        div.onclick = () => selectCard(cardVal);
+        container.appendChild(div);
+      });
+    }
+
+    /* Gestão do Timer Timebox */
+    function startTimer(seconds) {
+      if (myRole !== 'facilitator') return;
+      roomRef.child('timer').set({ seconds: seconds, running: true });
+      clearInterval(timerInterval);
+      let s = seconds;
+      timerInterval = setInterval(() => {
+        s--;
+        if (s <= 0) {
+          clearInterval(timerInterval);
+          roomRef.child('timer').set({ seconds: 0, running: false });
+        } else {
+          roomRef.child('timer/seconds').set(s);
+        }
+      }, 1000);
+    }
+
+    function stopTimer() {
+      if (myRole !== 'facilitator') return;
+      clearInterval(timerInterval);
+      roomRef.child('timer/running').set(false);
+    }
+
+    function renderTimer(seconds, running) {
+      const disp = document.getElementById('timerDisplay');
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      disp.innerText = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+      disp.classList.toggle('urgent', seconds > 0 && seconds <= 15);
+    }
+
+    /* Modal do Visualizador de PDF Embutido */
+    function openPdfDocument(storyKey) {
+      const story = gameState.stories[storyKey];
+      if (!story || !story.pdfData) {
+        alert('Documento PDF não anexado.');
+        return;
+      }
+      document.getElementById('pdfViewerTitle').innerText = `📄 ${story.pdfFileName || 'Requisitos da Demanda'}`;
+      document.getElementById('pdfViewerIframe').src = story.pdfData;
+      document.getElementById('pdfViewerModal').classList.add('active');
+    }
+
+    function closePdfModal() {
+      document.getElementById('pdfViewerModal').classList.remove('active');
+      document.getElementById('pdfViewerIframe').src = "";
+    }
+
+    function syncQaBoxFields() {
+      if (!gameState.activeStoryKey || !gameState.stories[gameState.activeStoryKey]) {
+        document.getElementById('qaSelectedStoryName').innerText = 'Selecione uma tarefa à esquerda para gerenciar';
+        document.getElementById('inputQaPdfFile').value = '';
+        document.getElementById('lblCurrentPdfName').innerText = '';
+        document.getElementById('inputQaAcceptance').value = '';
+        document.getElementById('inputQaTestHours').value = '';
+        return;
+      }
+
+      const curStory = gameState.stories[gameState.activeStoryKey];
+      document.getElementById('qaSelectedStoryName').innerText = `Editando: ${curStory.title}`;
+      document.getElementById('lblCurrentPdfName').innerText = curStory.pdfFileName ? `Anexo atual: ${curStory.pdfFileName}` : 'Nenhum PDF anexado';
+      document.getElementById('inputQaAcceptance').value = curStory.acceptanceCriteria || '';
+      document.getElementById('inputQaTestHours').value = (curStory.qaHours !== undefined && curStory.qaHours !== null) ? curStory.qaHours : '';
+    }
+
+    function saveRequirementsAndQA() {
+      if (myRole !== 'analyst' && myRole !== 'facilitator') {
+        alert('Permissão restrita ao Analista de Requisitos/QA ou GP.');
+        return;
+      }
+      if (!gameState.activeStoryKey) {
+        alert('Selecione primeiro uma história na lista lateral.');
+        return;
+      }
+
+      const fileInput = document.getElementById('inputQaPdfFile');
+      const file = fileInput.files[0];
+      const qaHoursVal = document.getElementById('inputQaTestHours').value.trim();
+      const qaHours = qaHoursVal !== '' ? (parseFloat(qaHoursVal) || 0) : null;
+      const acceptance = document.getElementById('inputQaAcceptance').value.trim();
+      const curStory = gameState.stories[gameState.activeStoryKey] || {};
+
+      const updateData = {
+        acceptanceCriteria: acceptance,
+        qaHours: qaHours,
+        totalHours: (curStory.points !== undefined && curStory.points !== null) ? ((curStory.hours || 0) + (qaHours || 0)) : null
+      };
+
+      if (file) {
+        if (file.type !== 'application/pdf') {
+          alert('Por favor, selecione exclusivamente um arquivo PDF.');
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          updateData.pdfData = e.target.result;
+          updateData.pdfFileName = file.name;
+
+          roomRef.child(`stories/${gameState.activeStoryKey}`).update(updateData);
+          alert('PDF e dados de QA salvos e liberados com sucesso!');
+          fileInput.value = '';
+        };
+        reader.readAsDataURL(file);
+      } else {
+        roomRef.child(`stories/${gameState.activeStoryKey}`).update(updateData);
+        alert('Dados da demanda atualizados com sucesso!');
+      }
+    }
+
+    function renderTable() {
+      const container = document.getElementById('playersGrid');
+      container.innerHTML = '';
+
+      const devs = Object.values(gameState.players).filter(p => p.role === 'dev');
+      let votedCount = 0;
+      let numericVotes = [];
+      let playerVotesMap = [];
+
+      devs.forEach(player => {
+        const hasVoted = player.vote !== null && player.vote !== undefined;
+        if (hasVoted) votedCount++;
+
+        const card = document.createElement('div');
+        card.className = `player-card ${hasVoted ? 'has-voted' : ''} ${gameState.revealed ? 'revealed' : ''}`;
+
+        let display = '';
+        if (gameState.revealed) {
+          display = player.vote || '-';
+          const n = parseCard(player.vote);
+          if (!isNaN(n)) {
+            numericVotes.push(n);
+            playerVotesMap.push({ name: player.name, vote: n });
+          }
+        } else if (hasVoted) {
+          display = '✓';
+        }
+
+        card.innerHTML = `<div class="card-box">${display}</div><span class="player-name">${player.name}</span>`;
+        container.appendChild(card);
+      });
+
+      document.getElementById('statVoted').innerText = `${votedCount}/${devs.length}`;
+
+      const allDevsVoted = devs.length > 0 && votedCount === devs.length;
+      const readyBanner = document.getElementById('readyNotificationBanner');
+      if (myRole === 'facilitator' && allDevsVoted && !gameState.revealed) {
+        readyBanner.style.display = 'flex';
+      } else {
+        readyBanner.style.display = 'none';
+      }
+
+      const debatePanel = document.getElementById('debatePanel');
+      const activeStory = gameState.activeStoryKey ? gameState.stories[gameState.activeStoryKey] : null;
+
+      // Renderização de Critérios e PDF na Mesa
+      const pdfContainer = document.getElementById('activeStoryPdfContainer');
+      const acceptanceElem = document.getElementById('activeStoryAcceptance');
+
+      if (activeStory) {
+        acceptanceElem.innerText = activeStory.acceptanceCriteria ? `Regras: ${activeStory.acceptanceCriteria}` : '';
+        if (activeStory.pdfData) {
+          pdfContainer.innerHTML = `<button class="btn btn-secondary" onclick="openPdfDocument('${gameState.activeStoryKey}')" style="font-size: 0.76rem; padding: 4px 10px;">📄 Visualizar PDF (${activeStory.pdfFileName || 'doc.pdf'})</button>`;
+        } else {
+          pdfContainer.innerHTML = `<span style="font-size: 0.72rem; color: var(--amber);">⚠️ Demanda aguardando PDF de requisitos</span>`;
+        }
+      } else {
+        acceptanceElem.innerText = '';
+        pdfContainer.innerHTML = '';
+      }
+
+      // Painel de Resultados & Análise GP
+      if (gameState.revealed && numericVotes.length > 0 && config.calcScore) {
+        const sum = numericVotes.reduce((a, b) => a + b, 0);
+        const avg = (sum / numericVotes.length).toFixed(1);
+        
+        const counts = {};
+        numericVotes.forEach(v => counts[v] = (counts[v] || 0) + 1);
+        const consensus = Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
+        currentCalculatedConsensus = consensus;
+
+        const devHours = consensus * config.hourMultiplier;
+        const qaHours = (activeStory && activeStory.qaHours) ? activeStory.qaHours : 0;
+        const totalDemanda = devHours + qaHours;
+
+        document.getElementById('statConsensus').innerText = `${consensus} pts (${devHours}h)`;
+        document.getElementById('statQaHours').innerText = activeStory && activeStory.qaHours !== undefined && activeStory.qaHours !== null ? `${activeStory.qaHours}h` : '-';
+        document.getElementById('statTotalHours').innerText = `${totalDemanda}h Total`;
+
+        const minVal = Math.min(...numericVotes);
+        const maxVal = Math.max(...numericVotes);
+        const minDevs = playerVotesMap.filter(p => p.vote === minVal).map(p => p.name).join(', ');
+        const maxDevs = playerVotesMap.filter(p => p.vote === maxVal).map(p => p.name).join(', ');
+
+        document.getElementById('minVoteDevs').innerText = minDevs || '-';
+        document.getElementById('minVoteVal').innerText = `${minVal} pts`;
+        document.getElementById('maxVoteDevs').innerText = maxDevs || '-';
+        document.getElementById('maxVoteVal').innerText = `${maxVal} pts`;
+        document.getElementById('debateAvgAdoption').innerText = `Média: ${avg} pts | Consenso: ${consensus} pts`;
+
+        if (minVal === maxVal) {
+          document.getElementById('debateScriptText').innerHTML = `🎉 <strong>Unanimidade total!</strong> Todo o time pontuou em <strong>${minVal} pontos</strong>.`;
+          // Dispara celebração visual
+          confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
+        } else {
+          document.getElementById('debateScriptText').innerHTML = `Alinhe com <strong>${minDevs}</strong> (${minVal} pts) e <strong>${maxDevs}</strong> (${maxVal} pts). Desejam ajustar?`;
+        }
+
+        debatePanel.classList.toggle('active', myRole === 'facilitator');
+      } else {
+        currentCalculatedConsensus = null;
+        document.getElementById('statConsensus').innerText = '-';
+        document.getElementById('statQaHours').innerText = activeStory && activeStory.qaHours !== undefined && activeStory.qaHours !== null ? `${activeStory.qaHours}h` : '-';
+        document.getElementById('statTotalHours').innerText = activeStory && activeStory.totalHours !== undefined && activeStory.totalHours !== null ? `${activeStory.totalHours}h` : '-';
+        debatePanel.classList.remove('active');
+      }
+
+      document.getElementById('btnReveal').innerText = gameState.revealed ? 'Ocultar Cartas' : 'Revelar Cartas';
+      document.getElementById('activeStoryTitle').innerText = gameState.activeStory;
+    }
+
+    function toggleReveal() {
+      if (myRole !== 'facilitator') return;
+      roomRef.child('revealed').set(!gameState.revealed);
+    }
+
+    function resetRound() {
+      if (myRole !== 'facilitator') return;
+      const updates = { revealed: false };
+      Object.keys(gameState.players).forEach(id => {
+        updates['players/' + id + '/vote'] = null;
+      });
+      roomRef.update(updates);
+      stopTimer();
+    }
+
+    function allowDevsToAdjust() {
+      if (myRole !== 'facilitator') return;
+      roomRef.child('config/allowChange').set(true);
+      alert('Votos reabertos! Desenvolvedores podem alterar os palpites.');
+    }
+
+    function assignScoreToCurrentStory() {
+      if (myRole !== 'facilitator') return;
+      if (!gameState.activeStoryKey) {
+        alert('Selecione primeiro uma história.');
+        return;
+      }
+      if (!currentCalculatedConsensus) {
+        alert('Aguarde os votos serem revelados para salvar.');
+        return;
+      }
+
+      const curStory = gameState.stories[gameState.activeStoryKey] || {};
+      const points = currentCalculatedConsensus;
+      const devHours = points * config.hourMultiplier;
+      const qaHours = curStory.qaHours || 0;
+      const totalHours = devHours + qaHours;
+
+      roomRef.child(`stories/${gameState.activeStoryKey}`).update({
+        points: points,
+        hours: devHours,
+        totalHours: totalHours
+      });
+
+      alert(`Demanda pontuada com sucesso: ${points} pts (${devHours}h Dev + ${qaHours}h QA = ${totalHours}h Total)!`);
+    }
+
+    function addStories() {
+      if (myRole !== 'facilitator') return;
+      const text = document.getElementById('storyInput').value.trim();
+      if (!text) return;
+      text.split('\n').forEach(line => {
+        const item = line.trim();
+        if (item) {
+          roomRef.child('stories').push({ 
+            title: item, 
+            points: null, 
+            hours: null,
+            pdfData: null,
+            pdfFileName: null,
+            acceptanceCriteria: null,
+            qaHours: null,
+            totalHours: null
+          });
+        }
+      });
+      document.getElementById('storyInput').value = '';
+    }
+
+    function clearBacklog() {
+      if (myRole !== 'facilitator') return;
+      if (confirm('Tem certeza de que deseja limpar todas as histórias da Sprint?')) {
+        roomRef.child('stories').remove();
+        roomRef.child('activeStory').set('Aguardando seleção...');
+        roomRef.child('activeStoryKey').set(null);
+        resetRound();
+      }
+    }
+
+    /* Exportador Executivo para CSV / Excel */
+    function exportSprintReport() {
+      const stories = Object.values(gameState.stories);
+      if (stories.length === 0) {
+        alert('Nenhuma demanda cadastrada para exportação.');
+        return;
+      }
+
+      let csv = 'Demanda;Criterios de Aceite;Pontos Dev;Horas Dev;Horas QA;Total Horas Demanda;Status\n';
+      stories.forEach(s => {
+        const status = s.totalHours ? 'Estimada' : (s.pdfData ? 'Pronta para Voto' : 'Aguardando Requisitos');
+        csv += `"${s.title.replace(/"/g, '""')}";"${(s.acceptanceCriteria || '').replace(/"/g, '""')}";"${s.points || '-'}";"${s.hours || '-'}";"${s.qaHours || '-'}";"${s.totalHours || '-'}";"${status}"\n`;
+      });
+
+      const blob = new Blob(["\ufeff" + csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Relatorio_Sprint_${config.gameName.replace(/[^a-zA-Z0-9]/g, '_')}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function renderStories() {
+      const ul = document.getElementById('storyList');
+      ul.innerHTML = '';
+      
+      Object.entries(gameState.stories).forEach(([key, story]) => {
+        const li = document.createElement('li');
+        li.className = `story-item ${gameState.activeStoryKey === key ? 'active' : ''}`;
+        
+        let statusBadge = '';
+        if (!story.pdfData) {
+          statusBadge = '<span class="badge-status badge-pending">Aguardando PDF</span>';
+        } else if (story.points === null || story.points === undefined) {
+          statusBadge = '<span class="badge-status badge-ready">Pronta para Votação</span>';
+        } else {
+          statusBadge = `<span class="badge-status badge-done">✓ ${story.totalHours || story.hours}h Total (Dev ${story.hours}h + QA ${story.qaHours || 0}h)</span>`;
+        }
+
+        let pdfButton = '';
+        if (story.pdfData) {
+          pdfButton = `<button class="badge-pdf-button" onclick="event.stopPropagation(); openPdfDocument('${key}');">📄 ${story.pdfFileName || 'PDF Anexo'}</button>`;
+        }
+
+        li.innerHTML = `
+          <div><strong>${story.title}</strong></div>
+          <div class="story-meta">
+            ${statusBadge}
+            ${pdfButton}
+          </div>
+        `;
+
+        li.onclick = () => {
+          if (myRole === 'facilitator' || myRole === 'analyst') {
+            roomRef.child('activeStory').set(story.title);
+            roomRef.child('activeStoryKey').set(key);
+            if (myRole === 'facilitator') resetRound();
+          }
+        };
+        ul.appendChild(li);
+      });
+    }
+
+    applyRolePermissions();
+    syncMyPlayer();
+  </script>
+</body>
+</html>
